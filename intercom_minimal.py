@@ -15,9 +15,9 @@ parser.add_argument('-o', '--output-device', type=int_or_str,
                     help='output device ID or substring')
 parser.add_argument('-c', '--channels', type=int, default=2,
                     help='number of channels')
-parser.add_argument('-t', '--dtype', help='audio data type')
+parser.add_argument('-t', '--dtype', default="int16", help='audio data type')
 parser.add_argument('-s', '--samplerate', type=float, help='sampling rate')
-parser.add_argument('-b', '--blocksize', type=int, help='block size')
+parser.add_argument('-b', '--blocksize', type=int, default=1024, help='block size')
 parser.add_argument('-l', '--latency', type=float, help='latency in seconds')
 parser.add_argument('-a', '--destination_address', type=int_or_str, default="localhost", help='destination address')
 parser.add_argument('-p', '--destination_port', type=int, default=4000, help='destination port')
@@ -25,7 +25,7 @@ args = parser.parse_args()
 
 try:
     import sounddevice as sd
-    import numpy as np # Make sure NumPy is loaded before it is used in the callback
+    import numpy as np
     import socket
 
     sending_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -42,7 +42,7 @@ try:
             chunk, sender = receiving_socket.recvfrom(32768)
             return chunk
         except BlockingIOError:
-            return np.zeros((args.blocksize, args.channels), args.dtype)
+            return np.zeros((args.blocksize, args.channels), np.int16)
 
     def callback(indata, outdata, frames, time, status):
         send(indata)
