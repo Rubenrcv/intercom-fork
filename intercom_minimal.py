@@ -25,7 +25,7 @@ args = parser.parse_args()
 
 try:
     import sounddevice as sd
-    import numpy  # Make sure NumPy is loaded before it is used in the callback
+    import numpy as np # Make sure NumPy is loaded before it is used in the callback
     import socket
 
     sending_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -41,8 +41,8 @@ try:
         try:
             chunk, sender = receiving_socket.recvfrom(32768)
             return chunk
-        except socket.timeout:
-            return np.zeros((args.block_size, args.channels), args.dtype)
+        except BlockingIOError:
+            return np.zeros((args.blocksize, args.channels), args.dtype)
 
     def callback(indata, outdata, frames, time, status):
         send(indata)
