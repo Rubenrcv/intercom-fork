@@ -3,6 +3,14 @@
 import argparse
 import logging
 
+def spinning_cursor():
+    ''' https://stackoverflow.com/questions/4995733/how-to-create-a-spinning-command-line-cursor
+    '''
+    while True:
+        for cursor in '|/-\\':
+            yield cursor
+spinner = spinning_cursor()
+
 def int_or_str(text):
     '''Helper function for argument parsing.
     '''
@@ -50,23 +58,116 @@ try:
     receiving_socket.bind(listening_endpoint)
     receiving_socket.settimeout(0)
 
-    def send(chunk):
-        sending_socket.sendto(chunk, (args.destination_address, args.destination_port))
+    def pack_chunk(chunk):
+        ''' Builds a packet with a chunk.
 
-    def receive():
+        Parameters
+        ----------
+
+        chunk : numpy.ndarray
+
+            A chunk of audio.
+
+        Returns
+        -------
+
+        bytes
+
+            A packet.
+        '''
+        return chunk
+
+    def send_packet(packet):
+        ''' Sends an UDP packet.
+
+        Parameters
+        ----------
+
+        packet : bytes
+
+            A packet structure with the sequence of bytes to send.
+
+        '''
+        sending_socket.sendto(packet, (args.destination_address, args.destination_port))
+
+    def receive_packet():
+        ''' Receives an UDP packet without blocking.
+
+        Returns
+        -------
+
+        bytes
+
+           A packet.
+        '''
         try:
-            chunk, sender = receiving_socket.recvfrom(MAX_PAYLOAD_BYTES)
-            chunk = np.frombuffer(chunk, SAMPLE_TYPE)
-            chunk = chunk.reshape(args.frames_per_chunk, args.number_of_channels)
-            return chunk
+            packet, sender = receiving_socket.recvfrom(MAX_PAYLOAD_BYTES)
+            return packet
         except BlockingIOError:
-            return np.zeros((args.frames_per_chunk, args.number_of_channels), SAMPLE_TYPE)
+            raise
+
+    def unpack_packet(packet):
+        ''' Unpack a packet.
+
+        Parameters
+        ----------
+
+        packet : bytes
+
+            A packet.
+
+        Returns
+        -------
+
+        numpy.ndarray
+
+            A chunk.
+        '''
+           
+        chunk = np.frombuffer(packet, SAMPLE_TYPE)
+        chunk = chunk.reshape(args.frames_per_chunk, args.number_of_channels)
+        return chunk
 
     def record_io_and_play(indata, outdata, frames, time, status):
-        send(indata)
-        chunk = receive()
+        '''Interruption handler that samples a chunk, builds a packet with the
+        chunk, sends the packet, receives a packet, unpacks it to get
+        a chunk, and plays the chunk.
+
+        Parameters
+        ----------
+
+        indata : numpy.ndarray
+
+            The chunk of audio with the recorded data.
+
+        outdata : numpy.ndarray
+
+            The chunk of audio with the data to play.
+
+        frames : int16
+
+            The number of frames in indata and outdata.
+
+        time : CData
+
+            Time-stamps of the first frame in indata, in outdata (that
+            is time at which the callback function was called.
+
+        status : CallbackFlags
+
+            Indicates if underflow or overflow conditions happened
+            during the last call to the callbak function.
+
+        '''
+        packet = pack_chunk(indata)
+        send_packet(packet)
+        try:
+            packet = receive_packet()
+            chunk = unpack_packet(packet)
+        except BlockingIOError:
+            chunk = np.zeros((args.frames_per_chunk, args.number_of_channels), SAMPLE_TYPE)
         outdata[:] = chunk
-        print(".", end='', flush=True)
+        print(next(spinner), end='\b', flush=True)
 
     with sd.Stream(device=(args.input_device, args.output_device),
                    dtype=SAMPLE_TYPE,
