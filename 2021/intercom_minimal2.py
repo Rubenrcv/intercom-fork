@@ -205,7 +205,9 @@ class Intercom_minimal:
         chunk = self.receive()
 
         # Gives NumPy structure to the chunk.
-        chunk = np.frombuffer(chunk, np.int16).reshape(self.frames_per_chunk, self.number_of_channels)
+        chunk = np.frombuffer(chunk, np.int16)
+        print(chunk.shape)
+        chunk = chunk.reshape(self.frames_per_chunk, self.number_of_channels)
         
         # Puts the received chunk on the top of the queue. Notice that
         # this is a pointers copy ([shallow
